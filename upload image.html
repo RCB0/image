@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -26,8 +28,8 @@
 }
 
 .image-item img {
-  max-width: var(--image-size, 150px); /* Default size */
-  max-height: var(--image-size, 150px); /* Default size */
+  max-width: var(--image-size, 150px); 
+  max-height: var(--image-size, 150px); 
   display: block;
   border-radius: 5px;
   cursor: pointer;
@@ -42,6 +44,18 @@
   border: none;
   padding: 5px;
   border-radius: 50%;
+  cursor: pointer;
+}
+
+.image-item .copy-btn {
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 5px;
+  border-radius: 5px;
   cursor: pointer;
 }
 
@@ -83,6 +97,8 @@
     <input type="range" id="sizeRange" class="input-size" min="50" max="250" value="150" onchange="changeImageSize(this.value)">
     <input type="number" id="sizeInput" class="input-size" min="50" max="250" value="150" oninput="changeImageSize(this.value)">
     <span id="sizeValue">Image Size: 150px</span>
+    <input type="text" id="imageLinkInput" placeholder="Paste image link here" onkeydown="if(event.key === 'Enter') addImageByLink()">
+    <button onclick="addImageByLink()">Add Image</button>
     <div id="progressBar">
       <div id="progress">0%</div>
     </div>
@@ -103,10 +119,8 @@
     function handleDrop(event) {
       event.preventDefault();
       imageDropArea.classList.remove('drag-over');
-      
       const dt = event.dataTransfer;
       const files = dt.files || event.target.files;
-
       uploadImages(files);
     }
 
@@ -118,7 +132,6 @@
     // Handle file selection event
     function handleFileSelect(event) {
       const files = event.target.files;
-
       uploadImages(files);
     }
 
@@ -130,37 +143,14 @@
 
       function uploadFile(file) {
         const reader = new FileReader();
-
         reader.onload = function(e) {
           const imageSrc = e.target.result;
-
-          // Create HTML elements for image preview
-          const imageItem = document.createElement('div');
-          imageItem.classList.add('image-item');
-
-          const img = document.createElement('img');
-          img.src = imageSrc;
-
-          const deleteBtn = document.createElement('button');
-          deleteBtn.classList.add('delete-btn');
-          deleteBtn.textContent = 'X';
-          deleteBtn.addEventListener('click', function() {
-            deleteImage(imageItem, file);
-          });
-
-          imageItem.appendChild(img);
-          imageItem.appendChild(deleteBtn);
-          imageContainer.appendChild(imageItem);
-
-          // Save image to local storage
+          addImageToContainer(imageSrc);
           saveImageToLocalStorage(imageSrc);
-
           count++;
           const percent = Math.round((count / files.length) * 100);
           progressBar.style.width = `${percent}%`;
           progressBar.textContent = `${percent}%`;
-
-          // When all files are uploaded, reset progress bar
           if (count === files.length) {
             setTimeout(() => {
               progressBar.style.width = '0%';
@@ -168,106 +158,117 @@
             }, 1000);
           }
         };
-
         reader.readAsDataURL(file);
       }
 
-      // Upload each file sequentially
       Array.from(files).forEach(uploadFile);
     }
 
-    // Function to delete an image
-    function deleteImage(imageItem, file) {
-      const imageContainer = document.getElementById('imageContainer');
-      imageContainer.removeChild(imageItem);
-
-      // Remove image from local storage
-      removeImageFromLocalStorage(file);
+    // Function to add image by link
+    function addImageByLink() {
+      const imageLinkInput = document.getElementById('imageLinkInput');
+      const imageSrc = imageLinkInput.value;
+      if (imageSrc) {
+        addImageToContainer(imageSrc);
+        saveImageToLocalStorage(imageSrc);
+        imageLinkInput.value = '';
+      }
     }
 
-    // Function to delete all images
+    // Function to add image to container
+    function addImageToContainer(imageSrc) {
+      const imageContainer = document.getElementById('imageContainer');
+      const imageItem = document.createElement('div');
+      imageItem.classList.add('image-item');
+      const img = document.createElement('img');
+      img.src = imageSrc;
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.classList.add('delete-btn');
+      deleteBtn.textContent = 'X';
+      deleteBtn.addEventListener('click', function() {
+        deleteImage(imageItem, imageSrc);
+      });
+
+      const copyBtn = document.createElement('button');
+      copyBtn.classList.add('copy-btn');
+      copyBtn.textContent = 'Copy Link';
+      copyBtn.addEventListener('click', function() {
+        copyImageLink(imageSrc);
+      });
+
+      imageItem.appendChild(img);
+      imageItem.appendChild(deleteBtn);
+      imageItem.appendChild(copyBtn);
+      imageContainer.appendChild(imageItem);
+    }
+
+    function deleteImage(imageItem, imageSrc) {
+      const imageContainer = document.getElementById('imageContainer');
+      imageContainer.removeChild(imageItem);
+      removeImageFromLocalStorage(imageSrc);
+    }
+
     function deleteAll() {
       const imageContainer = document.getElementById('imageContainer');
       const confirmed = confirm('Are you sure you want to delete all images?');
-
       if (confirmed) {
         while (imageContainer.firstChild) {
           imageContainer.removeChild(imageContainer.firstChild);
         }
-
-        // Clear local storage
         localStorage.removeItem('uploadedImages');
       }
     }
 
-    // Function to save image data to local storage
+    function copyImageLink(imageSrc) {
+      const tempInput = document.createElement('input');
+      tempInput.value = imageSrc;
+      document.body.appendChild(tempInput);
+      tempInput.select();
+      document.execCommand('copy');
+      document.body.removeChild(tempInput);
+      alert('Image link copied to clipboard.');
+    }
+
     function saveImageToLocalStorage(imageSrc) {
       let images = JSON.parse(localStorage.getItem('uploadedImages')) || [];
       images.push(imageSrc);
       localStorage.setItem('uploadedImages', JSON.stringify(images));
     }
 
-    // Function to remove image data from local storage
-    function removeImageFromLocalStorage(file) {
+    function removeImageFromLocalStorage(imageSrc) {
       let images = JSON.parse(localStorage.getItem('uploadedImages')) || [];
-      const fileIndex = images.indexOf(file);
-      if (fileIndex !== -1) {
-        images.splice(fileIndex, 1);
-        localStorage.setItem('uploadedImages', JSON.stringify(images));
-      }
+      images = images.filter(src => src !== imageSrc);
+      localStorage.setItem('uploadedImages', JSON.stringify(images));
     }
 
-    // Function to toggle visibility of image container
     function toggleVisibility() {
       const imageContainer = document.getElementById('imageContainer');
       imageContainer.classList.toggle('hidden');
-
-      // Save visibility state to local storage
       const visibilityState = imageContainer.classList.contains('hidden') ? 'hidden' : 'visible';
       localStorage.setItem('visibilityState', visibilityState);
     }
 
-    // Function to change image size using input
     function changeImageSize(size) {
-      const images = document.querySelectorAll('.image-item img');
       document.getElementById('sizeValue').textContent = `Image Size: ${size}px`;
       document.documentElement.style.setProperty('--image-size', `${size}px`);
-
-      // Save size to local storage
       localStorage.setItem('imageSize', size);
     }
 
-    // Load saved settings from local storage on page load
     document.addEventListener('DOMContentLoaded', () => {
       const savedImages = JSON.parse(localStorage.getItem('uploadedImages')) || [];
       const imageContainer = document.getElementById('imageContainer');
-
       savedImages.forEach(imageSrc => {
-        const imageItem = document.createElement('div');
-        imageItem.classList.add('image-item');
-
-        const img = document.createElement('img');
-        img.src = imageSrc;
-
-        const deleteBtn = document.createElement('button');
-        deleteBtn.classList.add('delete-btn');
-        deleteBtn.textContent = 'X';
-        deleteBtn.addEventListener('click', function() {
-          deleteImage(imageItem, imageSrc);
-        });
-
-        imageItem.appendChild(img);
-        imageItem.appendChild(deleteBtn);
-        imageContainer.appendChild(imageItem);
+        addImageToContainer(imageSrc);
       });
 
-      // Restore image size
       const savedImageSize = localStorage.getItem('imageSize');
       if (savedImageSize) {
         changeImageSize(savedImageSize);
+        document.getElementById('sizeRange').value = savedImageSize;
+        document.getElementById('sizeInput').value = savedImageSize;
       }
 
-      // Restore visibility state
       const visibilityState = localStorage.getItem('visibilityState');
       if (visibilityState === 'hidden') {
         toggleVisibility();
